@@ -24,7 +24,7 @@ async function upsertEvents(deviceId, events) {
 
   const { error } = await supabase
     .from('notification_events')
-    .upsert(rows, { onConflict: 'device_id,event_key', ignoreDuplicates: true });
+    .upsert(rows, { onConflict: 'device_id,event_key' });
 
   if (error) throw error;
   return rows.length;
@@ -78,11 +78,38 @@ export async function sendDueNotifications() {
     if (error) throw error;
     if (!events?.length) return;
 
-    const messages = events.map((event) => buildPushMessage(event, event.devices));
+    // Safety dedupe: if old rows exist with different event_key but same device/prayer/type/minute,
+    // send only one notification and mark the rest as skipped.
+    const seen = new Set();
+    const sendable = [];
+    const skipped = [];
+    for (const event of events) {
+      const minuteKey = new Date(event.scheduled_at).toISOString().slice(0, 16);
+      const sig = `${event.device_id}:${minuteKey}:${event.prayer_key || ''}:${event.event_type || ''}`;
+      if (seen.has(sig)) skipped.push(event);
+      else {
+        seen.add(sig);
+        sendable.push(event);
+      }
+    }
+
+    if (skipped.length) {
+      await supabase
+        .from('notification_events')
+        .update({
+          status: 'skipped_duplicate',
+          last_error: 'Skipped duplicate event with same device/prayer/type/minute',
+        })
+        .in('id', skipped.map((e) => e.id));
+    }
+
+    if (!sendable.length) return;
+
+    const messages = sendable.map((event) => buildPushMessage(event, event.devices));
     const tickets = await sendPushMessages(messages);
 
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i];
+    for (let i = 0; i < sendable.length; i++) {
+      const event = sendable[i];
       const ticket = tickets[i];
       const ok = ticket?.status === 'ok';
 

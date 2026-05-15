@@ -22,18 +22,30 @@ const toNumOrNull = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+const normalizeEventType = (raw) => {
+  const s = String(raw || 'adhan').trim().toLowerCase();
+  return s === 'at' ? 'adhan' : s;
+};
+
+const canonicalEventKey = ({ when, prayerKey, eventType, data = {} }) => {
+  const dateLabel = data.baseDate || when.toISOString().slice(0, 10);
+  return `${dateLabel}:${prayerKey || 'unknown'}:${eventType || 'adhan'}`;
+};
+
 const normalizeIncomingEvent = (e) => {
   const when = new Date(e.whenIso || e.date);
   if (!Number.isFinite(when.getTime())) return null;
   if (when.getTime() <= Date.now() + 10000) return null;
 
   const soundKey = cleanSoundKey(e.soundKey || e?.data?.soundKey || 'silent');
-  const eventKey = String(e.eventKey || `${e.title || 'event'}:${when.toISOString()}:${e.prayerKey || ''}:${e.eventType || ''}`);
+  const prayerKey = e.prayerKey || e?.data?.prayer || e?.data?.key || null;
+  const eventType = normalizeEventType(e.eventType || e?.data?.when || 'adhan');
+  const eventKey = canonicalEventKey({ when, prayerKey, eventType, data: e.data || {} });
 
   return {
     event_key: eventKey,
-    prayer_key: e.prayerKey || e?.data?.prayer || null,
-    event_type: e.eventType || e?.data?.when || null,
+    prayer_key: prayerKey,
+    event_type: eventType,
     title: String(e.title || ''),
     body: String(e.body || ''),
     scheduled_at: when.toISOString(),
@@ -89,6 +101,16 @@ app.post('/api/devices/register', async (req, res) => {
       .single();
 
     if (upsertError) throw upsertError;
+
+    // Prevent duplicates from old app/backend versions:
+    // every fresh register replaces all future pending events for this device.
+    // Sent/history rows stay untouched.
+    await supabase
+      .from('notification_events')
+      .delete()
+      .eq('device_id', device.id)
+      .eq('status', 'pending')
+      .gte('scheduled_at', new Date(Date.now() - 2 * 60 * 1000).toISOString());
 
     const normalized = (Array.isArray(events) ? events : [])
       .map(normalizeIncomingEvent)

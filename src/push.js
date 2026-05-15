@@ -1,6 +1,7 @@
 import { Expo } from 'expo-server-sdk';
 
-export const ANDROID_CHANNEL_ID_BASE = 'bangdan_prayer_v6';
+// Must match bangdan/notifications.js. New ID forces Android to create a fresh loud channel.
+export const ANDROID_CHANNEL_ID_BASE = 'bangdan_prayer_v7_loud';
 const expo = new Expo({ useFcmV1: true });
 
 export function normalizeSoundKey(raw) {

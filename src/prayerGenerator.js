@@ -105,11 +105,11 @@ export function generateEventsForDevice(device, daysAhead = 35) {
           eventKey: `${dateLabel}:${prayerKey}:adhan`,
           prayerKey,
           eventType: 'adhan',
-          title: `کاتی نوێژی ${prayerName}`,
+          title: 'ڕوونــاکــی',
           body: buildPrayerBodyKu(prayerKey),
           whenIso: adjusted.toISOString(),
           soundKey,
-          data: { type: 'prayer', prayer: prayerKey, when: 'adhan', soundKey },
+          data: { type: 'prayer', prayer: prayerKey, key: prayerKey, when: 'adhan', soundKey },
         });
       }
 
@@ -118,11 +118,11 @@ export function generateEventsForDevice(device, daysAhead = 35) {
           eventKey: `${dateLabel}:${prayerKey}:pre5`,
           prayerKey,
           eventType: 'pre5',
-          title: 'ئاگادارکردنەوەی نوێژ',
-          body: `٥ خولەک ماوە بۆ نوێژی ${prayerName}`,
+          title: 'ڕوونــاکــی',
+          body: `٥ خـولـەک مـاوە بـۆ بـانـگـی ${prayerName}`,
           whenIso: addMinutes(adjusted, -5).toISOString(),
           soundKey: 'silent',
-          data: { type: 'prayer', prayer: prayerKey, when: 'pre5', soundKey: 'silent' },
+          data: { type: 'prayer', prayer: prayerKey, key: prayerKey, when: 'pre5', soundKey: 'silent' },
         });
       }
 
@@ -131,11 +131,11 @@ export function generateEventsForDevice(device, daysAhead = 35) {
           eventKey: `${dateLabel}:${prayerKey}:post20`,
           prayerKey,
           eventType: 'post20',
-          title: 'یادخستنەوەی نوێژ',
-          body: `٢٠ خولەک بەسەر نوێژی ${prayerName}دا تێپەڕی`,
+          title: 'ڕوونــاکــی',
+          body: `٢٠ خـولـەک تـێـپـەڕیـوە لـە بـانـگـی ${prayerName}`,
           whenIso: addMinutes(adjusted, 20).toISOString(),
           soundKey: 'silent',
-          data: { type: 'prayer', prayer: prayerKey, when: 'post20', soundKey: 'silent' },
+          data: { type: 'prayer', prayer: prayerKey, key: prayerKey, when: 'post20', soundKey: 'silent' },
         });
       }
     }
