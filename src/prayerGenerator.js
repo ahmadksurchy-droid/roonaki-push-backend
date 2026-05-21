@@ -85,6 +85,15 @@ export function generateEventsForDevice(device, daysAhead = 35) {
     ? device.selected_muezzin_id
     : 'adhan';
 
+  const rawSettings = device.raw_settings || {};
+  const pushStartsAfterDaysRaw = Number(
+    rawSettings.pushStartsAfterDays ?? rawSettings.localNotificationDays ?? 0
+  );
+  const pushStartsAfterDays = Number.isFinite(pushStartsAfterDaysRaw)
+    ? Math.max(0, Math.min(30, pushStartsAfterDaysRaw))
+    : 0;
+  const minPushTime = Date.now() + pushStartsAfterDays * 24 * 60 * 60 * 1000 - 2 * 60 * 1000;
+
   const start = moment.tz(timezone).startOf('day');
   const events = [];
 
@@ -142,5 +151,8 @@ export function generateEventsForDevice(device, daysAhead = 35) {
   }
 
   const now = Date.now() + 30000;
-  return events.filter((e) => new Date(e.whenIso).getTime() > now);
+  return events.filter((e) => {
+    const t = new Date(e.whenIso).getTime();
+    return t > now && t >= minPushTime;
+  });
 }

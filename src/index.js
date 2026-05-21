@@ -112,9 +112,17 @@ app.post('/api/devices/register', async (req, res) => {
       .eq('status', 'pending')
       .gte('scheduled_at', new Date(Date.now() - 2 * 60 * 1000).toISOString());
 
+    const pushStartsAfterDaysRaw = Number(
+      settings.pushStartsAfterDays ?? settings.localNotificationDays ?? 0
+    );
+    const pushStartsAfterDays = Number.isFinite(pushStartsAfterDaysRaw)
+      ? Math.max(0, Math.min(30, pushStartsAfterDaysRaw))
+      : 0;
+    const minPushTime = Date.now() + pushStartsAfterDays * 24 * 60 * 60 * 1000 - 2 * 60 * 1000;
+
     const normalized = (Array.isArray(events) ? events : [])
       .map(normalizeIncomingEvent)
-      .filter(Boolean)
+      .filter((e) => e && new Date(e.scheduled_at).getTime() >= minPushTime)
       .map((e) => ({ ...e, device_id: device.id }));
 
     let insertedEvents = 0;
