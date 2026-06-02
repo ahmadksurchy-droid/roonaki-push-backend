@@ -27,6 +27,8 @@ export function buildPushMessage(event, device) {
       bangdanTag: 'bangdan_prayer',
       prayer: event.prayer_key,
       eventType: event.event_type,
+      eventKey: event.event_key,
+      scheduledAt: event.scheduled_at,
     },
     priority: 'high',
     channelId: androidChannelId(soundKey),
@@ -50,4 +52,17 @@ export async function sendPushMessages(messages) {
   }
 
   return tickets;
+}
+
+export async function getPushReceipts(ticketIds = []) {
+  const ids = ticketIds.filter(Boolean);
+  if (!ids.length) return {};
+
+  const receipts = {};
+  const chunks = expo.chunkPushNotificationReceiptIds(ids);
+  for (const chunk of chunks) {
+    const result = await expo.getPushNotificationReceiptsAsync(chunk);
+    Object.assign(receipts, result || {});
+  }
+  return receipts;
 }

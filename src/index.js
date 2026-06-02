@@ -32,6 +32,10 @@ const canonicalEventKey = ({ when, prayerKey, eventType, data = {} }) => {
   return `${dateLabel}:${prayerKey || 'unknown'}:${eventType || 'adhan'}`;
 };
 
+const minuteIso = (value) => new Date(value).toISOString().slice(0, 16);
+const buildDedupeKey = ({ scheduled_at, prayerKey, eventType }) =>
+  `${minuteIso(scheduled_at)}:${prayerKey || 'unknown'}:${eventType || 'adhan'}`;
+
 const normalizeIncomingEvent = (e) => {
   const when = new Date(e.whenIso || e.date);
   if (!Number.isFinite(when.getTime())) return null;
@@ -44,6 +48,7 @@ const normalizeIncomingEvent = (e) => {
 
   return {
     event_key: eventKey,
+    dedupe_key: buildDedupeKey({ scheduled_at: when.toISOString(), prayerKey, eventType }),
     prayer_key: prayerKey,
     event_type: eventType,
     title: String(e.title || ''),
@@ -52,6 +57,7 @@ const normalizeIncomingEvent = (e) => {
     sound_key: soundKey,
     data: { ...(e.data || {}), soundKey },
     status: 'pending',
+    updated_at: new Date().toISOString(),
   };
 };
 
@@ -61,6 +67,50 @@ app.get('/', (_req, res) => {
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
+});
+
+app.get('/api/admin/logs', async (req, res) => {
+  try {
+    const adminSecret = process.env.ADMIN_SECRET || '';
+    const provided = req.headers['x-admin-secret'] || req.query.secret || '';
+    if (!adminSecret || provided !== adminSecret) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const { data, error } = await supabase
+      .from('push_delivery_logs')
+      .select('created_at, install_id, prayer_key, event_type, scheduled_at, ticket_status, receipt_status, error')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    res.json({ ok: true, logs: data || [] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/admin/events', async (req, res) => {
+  try {
+    const adminSecret = process.env.ADMIN_SECRET || '';
+    const provided = req.headers['x-admin-secret'] || req.query.secret || '';
+    if (!adminSecret || provided !== adminSecret) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const limit = Math.min(Number(req.query.limit || 100), 300);
+    const { data, error } = await supabase
+      .from('notification_events')
+      .select('scheduled_at, prayer_key, event_type, sound_key, status, attempts, sent_at, last_error')
+      .order('scheduled_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    res.json({ ok: true, events: data || [] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.post('/api/devices/register', async (req, res) => {
@@ -129,7 +179,7 @@ app.post('/api/devices/register', async (req, res) => {
     if (normalized.length) {
       const { error: eventError } = await supabase
         .from('notification_events')
-        .upsert(normalized, { onConflict: 'device_id,event_key', ignoreDuplicates: true });
+        .upsert(normalized, { onConflict: 'device_id,event_key' });
       if (eventError) throw eventError;
       insertedEvents = normalized.length;
     }
