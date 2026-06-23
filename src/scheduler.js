@@ -237,8 +237,8 @@ export async function checkPushReceipts() {
 }
 
 export function startSchedulers() {
-  // User-requested plan: every 5 minutes check due prayer notifications.
-  cron.schedule('*/5 * * * *', sendDueNotifications);
+  // User-requested plan: every minute check due prayer notifications to ensure exact timing.
+  cron.schedule('* * * * *', sendDueNotifications);
 
   // Every 6 hours: generate/replenish future events for long-term delivery.
   cron.schedule('12 */6 * * *', ensureFutureEventsForAllDevices);

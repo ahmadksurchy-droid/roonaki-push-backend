@@ -152,15 +152,14 @@ app.post('/api/devices/register', async (req, res) => {
 
     if (upsertError) throw upsertError;
 
-    // Prevent duplicates from old app/backend versions:
-    // every fresh register replaces all future pending events for this device.
-    // Sent/history rows stay untouched.
+    // Prevent duplicates: When a device updates settings, we MUST delete ALL 
+    // pending events for this device to prevent sending old configurations 
+    // (like pre5/post20) even after the user disabled them.
     await supabase
       .from('notification_events')
       .delete()
       .eq('device_id', device.id)
-      .eq('status', 'pending')
-      .gte('scheduled_at', new Date(Date.now() - 2 * 60 * 1000).toISOString());
+      .eq('status', 'pending');
 
     const pushStartsAfterDaysRaw = Number(
       settings.pushStartsAfterDays ?? settings.localNotificationDays ?? 0
